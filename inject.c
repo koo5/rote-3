@@ -23,28 +23,62 @@ Copyright (c) 2004 Bruno T. C. de Oliveira
 #include "roteprivate.h"
 #include "inject_csi.h"
 #include <string.h>
+#include "wtf.h"
+
+#define true 1
+#define false 0
+
+void appendlog(RoteTerm *rt)
+{
+   void* new;
+   int loglen=20000;
+   if(rt->logl<loglen)
+   {
+	new = realloc(rt->log,(rt->logl+2)*sizeof(RoteCell**));
+	if(new)
+	{
+	    rt->log=(RoteCell **)new;
+	    rt->log[rt->logl]=malloc((1+rt->cols)*sizeof(RoteCell));
+	    rt->logl++;
+	    if(rt->log[rt->logl-1])
+	    {
+		memcpy(&rt->log[rt->logl-1][1],rt->cells[rt->scrolltop] , sizeof(RoteCell) * rt->cols);
+		rt->log[rt->logl-1][0].ch=rt->cols;
+	    }
+	}
+    }
+    else
+    {
+	memcpy(&rt->log[rt->logstart][1],rt->cells[rt->scrolltop] , sizeof(RoteCell) * rt->cols);
+	rt->log[rt->logstart][0].ch=rt->cols;
+	rt->logstart++;
+	if(rt->logstart>loglen-1)
+	    rt->logstart=0;
+    }
+}
 
 static void cursor_line_down(RoteTerm *rt) {
    int i;
    rt->crow++;
    rt->curpos_dirty = true;
-   if (rt->crow <= rt->pd->scrollbottom) return;
+   if (rt->crow <= rt->scrollbottom) return;
 
+    appendlog(rt);
    /* must scroll the scrolling region up by 1 line, and put cursor on 
     * last line of it */
-   rt->crow = rt->pd->scrollbottom;
-   
-   for (i = rt->pd->scrolltop; i < rt->pd->scrollbottom; i++) {
+   rt->crow = rt->scrollbottom;
+
+   for (i = rt->scrolltop; i < rt->scrollbottom; i++) {
       rt->line_dirty[i] = true;
       memcpy(rt->cells[i], rt->cells[i+1], sizeof(RoteCell) * rt->cols);
    }
       
-   rt->line_dirty[rt->pd->scrollbottom] = true;
+   rt->line_dirty[rt->scrollbottom] = true;
 
    /* clear last row of the scrolling region */
    for (i = 0; i < rt->cols; i++) {
-      rt->cells[rt->pd->scrollbottom][i].ch = 0x20;
-      rt->cells[rt->pd->scrollbottom][i].attr = 0x70;
+      rt->cells[rt->scrollbottom][i].ch = 0x20;
+      rt->cells[rt->scrollbottom][i].attr = 0x70;
    }
 
 }
@@ -53,33 +87,36 @@ static void cursor_line_up(RoteTerm *rt) {
    int i;
    rt->crow--;
    rt->curpos_dirty = true;
-   if (rt->crow >= rt->pd->scrolltop) return;
+   if (rt->crow >= rt->scrolltop) return;
 
    /* must scroll the scrolling region up by 1 line, and put cursor on 
     * first line of it */
-   rt->crow = rt->pd->scrolltop;
+   rt->crow = rt->scrolltop;
    
-   for (i = rt->pd->scrollbottom; i > rt->pd->scrolltop; i--) {
+   for (i = rt->scrollbottom; i > rt->scrolltop; i--) {
       rt->line_dirty[i] = true;
       memcpy(rt->cells[i], rt->cells[i-1], sizeof(RoteCell) * rt->cols);
    }
       
-   rt->line_dirty[rt->pd->scrolltop] = true;
+   rt->line_dirty[rt->scrolltop] = true;
 
    /* clear first row of the scrolling region */
    for (i = 0; i < rt->cols; i++) {
-      rt->cells[rt->pd->scrolltop][i].ch = 0x20;
-      rt->cells[rt->pd->scrolltop][i].attr = 0x70;
+      rt->cells[rt->scrolltop][i].ch = 0x20;
+      rt->cells[rt->scrolltop][i].attr = 0x70;
    }
 
 }
 
-static inline void put_normal_char(RoteTerm *rt, char c) {
+
+
+
+
+static inline void put_unicode_char(RoteTerm *rt, int c) {
    if (rt->ccol >= rt->cols) {
       rt->ccol = 0;
       cursor_line_down(rt);
    }
-
    rt->cells[rt->crow][rt->ccol].ch = c;
    rt->cells[rt->crow][rt->ccol].attr = rt->curattr;
    rt->ccol++;
@@ -87,6 +124,11 @@ static inline void put_normal_char(RoteTerm *rt, char c) {
    rt->line_dirty[rt->crow] = true;
    rt->curpos_dirty = true;
 }
+
+static inline void put_normal_char(RoteTerm *rt, char c) {
+    put_unicode_char(rt,c);
+}
+
 
 static inline void put_graphmode_char(RoteTerm *rt, char c) {
    char nc;
@@ -103,6 +145,8 @@ static inline void put_graphmode_char(RoteTerm *rt, char c) {
 
    put_normal_char(rt, nc);
 }
+
+
 
 static inline void new_escape_sequence(RoteTerm *rt) {
    rt->pd->escaped = true;
@@ -141,14 +185,17 @@ static void handle_control_char(RoteTerm *rt, char c) {
          break;
       case '\x9B': /* CSI character. Equivalent to ESC [ */
          new_escape_sequence(rt);
-         rt->pd->esbuf[rt->pd->esbuf_len++] = '[';
+         if(rt->pd->esbuf_len<ESEQ_BUF_SIZE)
+            rt->pd->esbuf[rt->pd->esbuf_len++] = '[';
          break;
       case '\x18': case '\x1A': /* these interrupt escape sequences */
          cancel_escape_sequence(rt);
          break;
       case '\a': /* bell */
+//         printf("DING, DING!");
          /* do nothing for now... maybe a visual bell would be nice? */
          break;
+    
       #ifdef DEBUG
       default:
          fprintf(stderr, "Unrecognized control char: %d (^%c)\n", c, c + '@');
@@ -172,14 +219,14 @@ static void try_interpret_escape_seq(RoteTerm *rt) {
    if (rt->pd->handler) {
       /* call custom handler */
       #ifdef DEBUG
-      fprintf(stderr, "Calling custom handler for ES <%s>.\n", rt->pd->esbuf);
+//      fprintf(stderr, "Calling custom handler for ES <%s>.\n", rt->pd->esbuf);
       #endif
 
       int answer = (*(rt->pd->handler))(rt, rt->pd->esbuf);
       if (answer == ROTE_HANDLERESULT_OK) {
          /* successfully handled */
          #ifdef DEBUG
-         fprintf(stderr, "Handler returned OK. Done with escape sequence.\n");
+//         fprintf(stderr, "Handler returned OK. Done with escape sequence.\n");
          #endif
 
          cancel_escape_sequence(rt);
@@ -189,7 +236,7 @@ static void try_interpret_escape_seq(RoteTerm *rt) {
          /* handler might handle it when more characters are appended to 
           * it. So for now we don't interpret it */
          #ifdef DEBUG
-         fprintf(stderr, "Handler returned NOTYET. Waiting for more chars.\n");
+//         fprintf(stderr, "Handler returned NOTYET. Waiting for more chars.\n");
          #endif
 
          return;
@@ -200,7 +247,7 @@ static void try_interpret_escape_seq(RoteTerm *rt) {
        * but we can still try handling it ourselves, so 
        * we proceed normally. */
       #ifdef DEBUG
-      fprintf(stderr, "Handler returned NOWAY. Trying our handlers.\n");
+//      fprintf(stderr, "Handler returned NOWAY. Trying our handlers.\n");
       #endif
    }
 
@@ -231,7 +278,7 @@ static void try_interpret_escape_seq(RoteTerm *rt) {
 
       /* rote_es_interpret_xterm_es(rt);     -- TODO!*/
       #ifdef DEBUG
-      fprintf(stderr, "Ignored XTerm ES.\n");
+//      fprintf(stderr, "Ignored XTerm ES.\n");
       #endif
       cancel_escape_sequence(rt);
    }
@@ -240,6 +287,17 @@ static void try_interpret_escape_seq(RoteTerm *rt) {
     * not yet be parsed, abort it */
    if (rt->pd->esbuf_len + 1 >= ESEQ_BUF_SIZE) cancel_escape_sequence(rt);
 }
+
+
+void unicrude(RoteTerm *rt, int x)
+{
+    if (wtf(x))
+    {
+	put_unicode_char(rt, etf);
+    }
+}
+
+
    
 void rote_vt_inject(RoteTerm *rt, const char *data, int len) {
    int i;
@@ -249,18 +307,22 @@ void rote_vt_inject(RoteTerm *rt, const char *data, int len) {
          handle_control_char(rt, *data);
          continue;
       }
-
       if (rt->pd->escaped && rt->pd->esbuf_len < ESEQ_BUF_SIZE) {
          /* append character to ongoing escape sequence */
          rt->pd->esbuf[rt->pd->esbuf_len] = *data;
          rt->pd->esbuf[++rt->pd->esbuf_len] = 0;
-
          try_interpret_escape_seq(rt);
       }
       else if (rt->pd->graphmode)
          put_graphmode_char(rt, *data);
+      else if (*data < 1)
+      {
+         unicrude(rt,*data);
+      }
       else
+      {
          put_normal_char(rt, *data);
+	}
    }
 }
 

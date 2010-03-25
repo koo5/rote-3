@@ -24,16 +24,25 @@ Copyright (c) 2004 Bruno T. C. de Oliveira
 
 #define ESEQ_BUF_SIZE 128  /* size of escape sequence buffer */
 #define MAX_CUSTOM_ES_HANDLERS 32
+#define MAX_CSI_ES_PARAMS 32
 
 /* Terminal private data */
 struct RoteTermPrivate_ {
+    int csiparam[MAX_CSI_ES_PARAMS];
+
    bool escaped;              /* whether we are currently reading an
                                * escape sequence */
 
    bool graphmode;            /* whether terminal is in graphical 
                                * character mode or not */
 
-   int scrolltop, scrollbottom;  /* current scrolling region of terminal */
+  //unicoode
+   int graphmode2;            /* whether terminal is in graphical 
+                               * character mode or not */
+
+//   unsigned char graphmode2b;
+
+
    int saved_x, saved_y;         /* saved cursor position */
 
    char esbuf[ESEQ_BUF_SIZE]; /* 0-terminated string. Does NOT include

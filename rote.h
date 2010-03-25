@@ -88,7 +88,7 @@ Copyright (c) 2004 Bruno T. C. de Oliveira
 
 /* Represents each of the text cells in the terminal screen */
 typedef struct RoteCell_ {
-   unsigned char ch;    /* >= 32, that is, control characters are not
+   unsigned int ch;    /* >= 32, that is, control characters are not
                          * allowed to be on the virtual screen */
 
    unsigned char attr;  /* a color attribute, as described previously */
@@ -105,6 +105,11 @@ typedef struct RoteTerm_ {
                                  * can't resize the terminal by changing
                                  * this (a segfault is about all you will 
                                  * accomplish). */
+    int logstart;
+    int logl;
+   RoteCell **log;         
+
+    int docellmouse;
 
    RoteCell **cells;            /* matrix of cells. This
                                  * matrix is indexed as cell[row][column]
@@ -114,7 +119,7 @@ typedef struct RoteTerm_ {
                                  * You may freely modify the contents of
                                  * the cells.
                                  */
-
+    int scrolltop,scrollbottom;
    int crow, ccol;              /* cursor coordinates. READ-ONLY. */
 
    unsigned char curattr;       /* current attribute, that is the attribute
@@ -124,8 +129,8 @@ typedef struct RoteTerm_ {
    pid_t childpid;              /* pid of the child process running in the
                                  * terminal; 0 for none. This is READ-ONLY. */
 
+    int cursorhidden;
    RoteTermPrivate *pd;         /* private state data */
-
    /* --- dirtiness flags: the following flags will be raised when the
     * corresponding items are modified. They can only be unset by YOU
     * (when, for example, you redraw the term or something) --- */
@@ -133,6 +138,10 @@ typedef struct RoteTerm_ {
    bool *line_dirty;            /* whether each row is dirty  */
    /* --- end dirtiness flags */
 } RoteTerm;
+
+void rote_vt_update_thready(char * buf, int bs, int * br, RoteTerm *rt) ;
+void chkbg(RoteTerm *t,char * msg);
+
 
 /* Creates a new virtual terminal with the given dimensions. You
  * must destroy it with rote_vt_destroy after you are done with it.
@@ -142,7 +151,7 @@ typedef struct RoteTerm_ {
  * Returns NULL on error.
  */
 RoteTerm *rote_vt_create(int rows, int cols);
-
+void rote_vt_resize(RoteTerm *rt,int rows, int cols);
 /* Destroys a virtual terminal previously created with
  * rote_vt_create. If rt == NULL, does nothing. */
 void rote_vt_destroy(RoteTerm *rt);
@@ -227,7 +236,8 @@ void rote_vt_draw(RoteTerm *rt, WINDOW *win, int startrow, int startcol,
  * that the linux text-mode console would produce for it). The argument,
  * keycode, must be a CURSES EXTENDED KEYCODE, the ones you get
  * when you use keypad(somewin, TRUE) (see man page). */
-void rote_vt_keypress(RoteTerm *rt, int keycode);
+void rote_vt_keypress(RoteTerm *rt, int i);
+void rote_vt_terminfo(RoteTerm *rt, char *c);
 
 /* Takes a snapshot of the current contents of the terminal and
  * saves them to a dynamically allocated buffer. Returns a pointer
@@ -301,4 +311,13 @@ void rote_vt_install_handler(RoteTerm *rt, rote_es_handler_t handler);
                                      * are added to it. */
 
 #endif
+
+
+void rote_vt_mousedown(RoteTerm *vt, int x, int y);
+void rote_vt_mouseup(RoteTerm *vt, int x, int y);
+void rote_vt_mousemove(RoteTerm *vt, int x, int y);
+
+char *rotoclipin(int sel);
+void rotoclipout(char * x, RoteTerm *t, int selection);
+
 

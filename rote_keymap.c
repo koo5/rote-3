@@ -20,54 +20,54 @@ Copyright (c) 2004 Bruno T. C. de Oliveira
 
 
 #include "rote.h"
-
-#include <ncurses.h>
+#include "curses.h"
+#include "term.h"
 #include <stdlib.h>
 #include <string.h>
 
-static const char *keytable[KEY_MAX+1];
-static int initialized = 0;
+RoteTerm *rit;
 
-static void keytable_init();
 
-void rote_vt_keypress(RoteTerm *rt, int keycode) {
-   char c = (char) keycode;
+void rote_vt_keypress(RoteTerm *rt, int i)
+{
+    char c=(char)i;
+    if(rt)
+    {
 
-   if (!initialized) keytable_init();
-
-   if (keycode >= 0 && keycode < KEY_MAX && keytable[keycode])
-      rote_vt_write(rt, keytable[keycode], strlen(keytable[keycode]));
-   else
-      rote_vt_write(rt, &c, 1); /* not special, just write it */
+    rote_vt_write(rt, &c, 1); /* not special, just write it */
+    }
+//    else printf("no rt\n");
 }
 
-static void keytable_init() {
-   initialized = 1;
-   memset(keytable, 0, KEY_MAX+1 * sizeof(const char*));
 
-   keytable['\n']          = "\r";
-   keytable[KEY_UP]        = "\e[A";
-   keytable[KEY_DOWN]      = "\e[B";
-   keytable[KEY_RIGHT]     = "\e[C";
-   keytable[KEY_LEFT]      = "\e[D";
-   keytable[KEY_BACKSPACE] = "\b";
-   keytable[KEY_HOME]      = "\e[1~";
-   keytable[KEY_IC]        = "\e[2~";
-   keytable[KEY_DC]        = "\e[3~";
-   keytable[KEY_END]       = "\e[4~";
-   keytable[KEY_PPAGE]     = "\e[5~";
-   keytable[KEY_NPAGE]     = "\e[6~";
-   keytable[KEY_SUSPEND]   = "\x1A";  /* Ctrl+Z gets mapped to this */
-   keytable[KEY_F(1)]      = "\e[[A";
-   keytable[KEY_F(2)]      = "\e[[B";
-   keytable[KEY_F(3)]      = "\e[[C";
-   keytable[KEY_F(4)]      = "\e[[D";
-   keytable[KEY_F(5)]      = "\e[[E";
-   keytable[KEY_F(6)]      = "\e[17~";
-   keytable[KEY_F(7)]      = "\e[18~";
-   keytable[KEY_F(8)]      = "\e[19~";
-   keytable[KEY_F(9)]      = "\e[20~";
-   keytable[KEY_F(10)]     = "\e[21~";
+int _rtput(int i)
+{
+    char c=(char)i;
+    rote_vt_write(rit,&c,1);
+    return 1;
 }
+
+
+void rote_vt_terminfo(RoteTerm *rt, char *c)
+{
+    if(rt)
+    {
+    rit=rt;
+    char *u=tigetstr(c);
+    if (u)
+    {
+	//if (u==(char *)-1)
+//	    printf("bubak\n");
+	//else
+	{
+	//    printf("%s\n",u);
+	    tputs(u,1,_rtput);
+	}
+    }
+    }
+//    else printf("no rt\n");
+}
+
+
 
 
