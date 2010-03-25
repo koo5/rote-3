@@ -1,4 +1,4 @@
-#include "rote.h"
+#include "../rote.h"
 #include "SDL/SDL_keysym.h"
 #include <stdio.h>
 
