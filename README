@@ -1,3 +1,5 @@
+EDIT/*see also the last 4 commits on http://repo.or.cz/w/librote.git *SHRUG**/
+
 ROTE - OUR OWN TERMINAL EMULATION LIBRARY
 Copyright (c) 2004 Bruno T. C. de Oliveira
 Licensed under the GNU Lesser General Public License
@@ -5,7 +7,7 @@ See the COPYING file for more details on the license terms.
 
 [[ AUTHOR AND PROJECT HOMEPAGE ]]
 This library was written by Bruno Takahashi C. de Oliveira, a
-Computer Science student at Universidade de São Paulo, Brazil.
+Computer Science student at Universidade de Sï¿½o Paulo, Brazil.
 The project home page is:
 
                 http://rote.sourceforge.net
