@@ -1,71 +1,73 @@
-//hey, this is not thread-safe!
 #include <stdlib.h>
 #include <stdio.h>
 
 
-unsigned char b[4];
-int pos=0;
-int len;
 #include "wtf.h"
-int wtf(unsigned char x)
+int wtf(unsigned char x, wtfdecoder *w)
 {
-    if (!pos )
+    if (!w->pos )
     {
-        pos=1;
+        w->pos=1;
         if ((x&224)==192)
         {
-            len=2;
-            b[1]=x&31;
+            w->len=2;
+            w->b[1]=x&31;
         }
         else if ((x&240)==224)
         {
-            b[1]=x&15;
-            len=3;
+            w->b[1]=x&15;
+            w->len=3;
         }
         else if ((x&248)==240)
         {
-            b[1]=x&3;
-            len=4;
+            w->b[1]=x&3;
+            w->len=4;
         }
         else
         {
-            pos=0;//o-0
-            len=0;
+            w->pos=0;//o-0
+            w->len=0;
         }
     }
     else
     {
-        pos++;
+        w->pos++;
 //	printf("pos %i\n", pos);
         if ((x&192)==128)
-            b[pos]=(x&63);
-        else pos=0;//printf("hmm\n");
+            w->b[w->pos]=(x&63);
+        else w->pos=0;//printf("hmm\n");
     }
-    if (pos==len)
+    if (w->pos==w->len)
     {
-        if (len==2)
+        if (w->len==2)
         {
-            b[pos]=b[pos]|((b[pos-1]&3)<<6);
-            b[pos-1]=((b[pos-1]&31) >> 2);
-            etf=b[pos]+b[pos-1]*256;
-            pos=0;
+            w->b[w->pos]=w->b[w->pos]|((w->b[w->pos-1]&3)<<6);
+            w->b[w->pos-1]=((w->b[w->pos-1]&31) >> 2);
+            w->etff=w->b[w->pos]+w->b[w->pos-1]*256;
+            w->pos=0;
             return 1;
 
         }
-        else if (len==3)
+        else if (w->len==3)
         {
-            b[pos]=b[pos]|((b[pos-1]&3)<<6);
-            b[pos-1]=((b[pos-1]&60) >> 2) | ((b[pos-2]&15) << 4);
-            etf=b[pos]+b[pos-1]*256;
-            pos=0;
+            w->b[w->pos]=w->b[w->pos]|((w->b[w->pos-1]&3)<<6);
+            w->b[w->pos-1]=((w->b[w->pos-1]&60) >> 2) | ((w->b[w->pos-2]&15) << 4);
+            w->etff=w->b[w->pos]+w->b[w->pos-1]*256;
+            w->pos=0;
             return 1;
 
         }
-        else if (len==4)
+        else if (w->len==4)
         {
+    	    w->pos=0;
             return 1;
         }
-        pos=0;
+        w->pos=0;
+    }
+    if(w->pos>4)
+    {
+	w->pos=0;
+	w->len=0;
     }
     return 0;
 }
@@ -83,7 +85,7 @@ int main(int argc, char *argv[])
 	{
 	    printf("%i ",t);
 	    if(wtf(t))
-		printf("%i\n",etf);
+		printf("%i\n",etff);
 	    if (t=='A') break;
 	}
 	}

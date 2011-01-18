@@ -30,15 +30,15 @@ Copyright (c) 2004 Bruno T. C. de Oliveira
 
 void appendlog(RoteTerm *rt)
 {
-   void* new;
-   int loglen=20000;
+   void* neww;
+   unsigned int loglen=20000;
    if(rt->logl<loglen)
    {
-	new = realloc(rt->log,(rt->logl+2)*sizeof(RoteCell**));
-	if(new)
+	neww = realloc(rt->log,(rt->logl+2)*sizeof(RoteCell*));
+	if(neww)
 	{
-	    rt->log=(RoteCell **)new;
-	    rt->log[rt->logl]=malloc((1+rt->cols)*sizeof(RoteCell));
+	    rt->log=(RoteCell **)neww;
+	    rt->log[rt->logl]=(RoteCell*)malloc((1+rt->cols)*sizeof(RoteCell));
 	    rt->logl++;
 	    if(rt->log[rt->logl-1])
 	    {
@@ -61,8 +61,11 @@ static void cursor_line_down(RoteTerm *rt) {
    int i;
    rt->crow++;
    rt->curpos_dirty = true;
+   rt->dirty=true;
    if (rt->crow <= rt->scrollbottom) return;
 
+    if(rt->stoppedscrollback)
+	rt->scroll++;
     appendlog(rt);
    /* must scroll the scrolling region up by 1 line, and put cursor on 
     * last line of it */
@@ -70,10 +73,12 @@ static void cursor_line_down(RoteTerm *rt) {
 
    for (i = rt->scrolltop; i < rt->scrollbottom; i++) {
       rt->line_dirty[i] = true;
+      rt->dirty=true;
       memcpy(rt->cells[i], rt->cells[i+1], sizeof(RoteCell) * rt->cols);
    }
       
    rt->line_dirty[rt->scrollbottom] = true;
+   rt->dirty=true;
 
    /* clear last row of the scrolling region */
    for (i = 0; i < rt->cols; i++) {
@@ -87,6 +92,7 @@ static void cursor_line_up(RoteTerm *rt) {
    int i;
    rt->crow--;
    rt->curpos_dirty = true;
+   rt->dirty=true;
    if (rt->crow >= rt->scrolltop) return;
 
    /* must scroll the scrolling region up by 1 line, and put cursor on 
@@ -95,10 +101,12 @@ static void cursor_line_up(RoteTerm *rt) {
    
    for (i = rt->scrollbottom; i > rt->scrolltop; i--) {
       rt->line_dirty[i] = true;
+      rt->dirty=true;
       memcpy(rt->cells[i], rt->cells[i-1], sizeof(RoteCell) * rt->cols);
    }
       
    rt->line_dirty[rt->scrolltop] = true;
+   rt->dirty=true;
 
    /* clear first row of the scrolling region */
    for (i = 0; i < rt->cols; i++) {
@@ -123,6 +131,7 @@ static inline void put_unicode_char(RoteTerm *rt, int c) {
 
    rt->line_dirty[rt->crow] = true;
    rt->curpos_dirty = true;
+   rt->dirty=true;
 }
 
 static inline void put_normal_char(RoteTerm *rt, char c) {
@@ -166,10 +175,12 @@ static void handle_control_char(RoteTerm *rt, char c) {
       case '\n':  /* line feed */
          rt->ccol = 0; cursor_line_down(rt);
          rt->curpos_dirty = true;
+	 rt->dirty=true;
          break;
       case '\b': /* backspace */
          if (rt->ccol > 0) rt->ccol--;
          rt->curpos_dirty = true;
+	 rt->dirty=true;
          break;
       case '\t': /* tab */
          while (rt->ccol % 8) put_normal_char(rt, ' ');
@@ -259,6 +270,26 @@ static void try_interpret_escape_seq(RoteTerm *rt) {
    }
 
    if (firstchar != '[' && firstchar != ']') {
+    if(!strncmp(rt->pd->esbuf, "clearscrollback",rt->pd->esbuf_len))
+    {
+     if(!strcmp(rt->pd->esbuf, "clearscrollback"))
+     {
+      printf("clearing scrollback\n");
+      clearscrollback(rt);
+      cancel_escape_sequence(rt);
+     }
+    return;
+    }
+    if(!strncmp(rt->pd->esbuf, "stopscrollback",rt->pd->esbuf_len))
+    {
+     if(!strcmp(rt->pd->esbuf, "stopscrollback"))
+     {
+      printf("stoping scrollback\n");
+      stopscrollback(rt);
+      cancel_escape_sequence(rt);
+     }
+    return;
+    }
       /* unrecognized escape sequence. Let's forget about it. */
       #ifdef DEBUG
       fprintf(stderr, "Unrecognized ES: <%s>\n", rt->pd->esbuf);
@@ -291,9 +322,9 @@ static void try_interpret_escape_seq(RoteTerm *rt) {
 
 void unicrude(RoteTerm *rt, int x)
 {
-    if (wtf(x))
+    if (wtf(x,&rt->pd->wtfd))
     {
-	put_unicode_char(rt, etf);
+	put_unicode_char(rt, rt->pd->wtfd.etff);
     }
 }
 
@@ -324,5 +355,6 @@ void rote_vt_inject(RoteTerm *rt, const char *data, int len) {
          put_normal_char(rt, *data);
 	}
    }
+   rt->dirty=1;
 }
 

@@ -1,7 +1,14 @@
 
 #ifndef etfh
 #define etfh
-int etf;
-int wtf(unsigned char x);
+typedef struct
+{
+    int etff;
+    unsigned char b[4];
+    int pos;
+    int len;
+} wtfdecoder;
+
+int wtf(unsigned char x, wtfdecoder *w);
 
 #endif

@@ -101,12 +101,14 @@ typedef struct RoteTermPrivate_ RoteTermPrivate;
  * of this structure, but please pay close attention to the fields
  * marked read-only or with special usage notes. */
 typedef struct RoteTerm_ {
-   int rows, cols;              /* terminal dimensions, READ-ONLY. You
+    int rows, cols;              /* terminal dimensions, READ-ONLY. You
                                  * can't resize the terminal by changing
                                  * this (a segfault is about all you will 
                                  * accomplish). */
-    int logstart;
-    int logl;
+    int stoppedscrollback;
+    int scroll;
+    unsigned int logstart;
+    unsigned int logl;
    RoteCell **log;         
 
     int docellmouse;
@@ -134,6 +136,7 @@ typedef struct RoteTerm_ {
    /* --- dirtiness flags: the following flags will be raised when the
     * corresponding items are modified. They can only be unset by YOU
     * (when, for example, you redraw the term or something) --- */
+   bool dirty;
    bool curpos_dirty;           /* whether cursor location has changed */
    bool *line_dirty;            /* whether each row is dirty  */
    /* --- end dirtiness flags */
@@ -177,7 +180,7 @@ void rote_vt_destroy(RoteTerm *rt);
  * to execute the command and will exit with status 127. You can catch
  * that by installing a SIGCHLD handler if you want.
  */
-pid_t rote_vt_forkpty(RoteTerm *rt, const char *command);
+pid_t rote_vt_forkpty(RoteTerm *rt, const char *command, char * env, char *envval);
 
 /* Disconnects the RoteTerm from its forked child process. This function
  * should be called when the child process dies or something of the sort.
@@ -237,7 +240,7 @@ void rote_vt_draw(RoteTerm *rt, WINDOW *win, int startrow, int startcol,
  * keycode, must be a CURSES EXTENDED KEYCODE, the ones you get
  * when you use keypad(somewin, TRUE) (see man page). */
 void rote_vt_keypress(RoteTerm *rt, int i);
-void rote_vt_terminfo(RoteTerm *rt, char *c);
+void rote_vt_terminfo(RoteTerm *rt, const char *c);
 
 /* Takes a snapshot of the current contents of the terminal and
  * saves them to a dynamically allocated buffer. Returns a pointer
@@ -321,3 +324,8 @@ char *rotoclipin(int sel);
 void rotoclipout(char * x, RoteTerm *t, int selection);
 
 
+
+void clearscrollback(RoteTerm * t);
+void stopscrollback(RoteTerm * t);
+
+void rote_vt_clear(RoteTerm*t);

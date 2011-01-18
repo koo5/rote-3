@@ -27,14 +27,14 @@ Copyright (c) 2004 Bruno T. C. de Oliveira
 #define true 1
 #define MAX_CSI_ES_PARAMS 32
 static inline void clamp_cursor_to_bounds(RoteTerm *rt) {
-   if (rt->crow < 0) rt->curpos_dirty = true, rt->crow = 0;
-   if (rt->ccol < 0) rt->curpos_dirty = true, rt->ccol = 0;
+   if (rt->crow < 0) rt->curpos_dirty = true, rt->dirty=true, rt->crow = 0;
+   if (rt->ccol < 0) rt->curpos_dirty = true, rt->dirty=true, rt->ccol = 0;
 
    if (rt->crow >= rt->rows) 
-      rt->curpos_dirty = true, rt->crow = rt->rows - 1;
+      rt->curpos_dirty = true, rt->dirty=true, rt->crow = rt->rows - 1;
 
    if (rt->ccol >= rt->cols)
-      rt->curpos_dirty = true, rt->ccol = rt->cols - 1;
+      rt->curpos_dirty = true, rt->dirty=true, rt->ccol = rt->cols - 1;
 }
 
 /* interprets a 'set attribute' (SGR) CSI escape sequence */
@@ -119,6 +119,7 @@ static void interpret_csi_ED(RoteTerm *rt, int param[], int pcount) {
    /* clean range */
    for (r = start_row; r <= end_row; r++) {
       rt->line_dirty[r] = true;
+      rt->dirty=true;
 
       for (c = (r == start_row ? start_col : 0);
                              c <= (r == end_row ? end_col : rt->cols - 1);
@@ -142,6 +143,7 @@ static void interpret_csi_CUP(RoteTerm *rt, int param[], int pcount) {
    rt->ccol = param[1] - 1;  /* convert from 1-based to 0-based */
 
    rt->curpos_dirty = true;
+   rt->dirty=true;
 
    clamp_cursor_to_bounds(rt);
 }
@@ -164,6 +166,7 @@ static void interpret_csi_C(RoteTerm *rt, char verb,
    }
 
    rt->curpos_dirty = true;
+   rt->dirty=true;
    clamp_cursor_to_bounds(rt);
 }
 
@@ -184,6 +187,7 @@ static void interpret_csi_EL(RoteTerm *rt, int param[], int pcount) {
    }
 
    rt->line_dirty[rt->crow] = true;
+   rt->dirty=true;
 }
 
 /* Interpret the 'insert blanks' sequence (ICH) */
@@ -200,6 +204,7 @@ static void interpret_csi_ICH(RoteTerm *rt, int param[], int pcount) {
    }
 
    rt->line_dirty[rt->crow] = true;
+   rt->dirty=true;
 }
 
 /* Interpret the 'delete chars' sequence (DCH) */
@@ -216,6 +221,7 @@ static void interpret_csi_DCH(RoteTerm *rt, int param[], int pcount) {
    }
 
    rt->line_dirty[rt->crow] = true;
+   rt->dirty=true;
 }
 
 /* Interpret an 'insert line' sequence (IL) */
@@ -228,6 +234,7 @@ static void interpret_csi_IL(RoteTerm *rt, int param[], int pcount) {
 
    for (i = rt->crow; i < rt->crow + n && i <= rt->scrollbottom; i++) {
       rt->line_dirty[i] = true;
+      rt->dirty=true;
       for (j = 0; j < rt->cols; j++) 
          rt->cells[i][j].ch = 0x20, rt->cells[i][j].attr = rt->curattr;
    }
@@ -241,6 +248,7 @@ static void interpret_csi_DL(RoteTerm *rt, int param[], int pcount) {
 
    for (i = rt->crow; i <= rt->scrollbottom; i++) {
       rt->line_dirty[i] = true;
+      rt->dirty=true;
       if (i + n <= rt->scrollbottom)
          memcpy(rt->cells[i], rt->cells[i+n], sizeof(RoteCell) * rt->cols);
       else {
@@ -261,6 +269,7 @@ static void interpret_csi_ECH(RoteTerm *rt, int param[], int pcount) {
    }
 
    rt->line_dirty[rt->crow] = true;
+   rt->dirty=true;
 }
         
 /* Interpret a 'set scrolling region' (DECSTBM) sequence */
@@ -289,15 +298,16 @@ static void interpret_csi_DECSTBM(RoteTerm *rt, int param[], int pcount) {
    rt->scrollbottom = newbottom;
 }
          
-static void interpret_csi_SAVECUR(RoteTerm *rt, int param[], int pcount) {
+static void interpret_csi_SAVECUR(RoteTerm *rt){//, int param[], int pcount) {
    rt->pd->saved_x = rt->ccol;
    rt->pd->saved_y = rt->crow;
 }
 
-static void interpret_csi_RESTORECUR(RoteTerm *rt, int param[], int pcount) {
+static void interpret_csi_RESTORECUR(RoteTerm *rt){//, int param[], int pcount) {
    rt->ccol = rt->pd->saved_x;
    rt->crow = rt->pd->saved_y;
    rt->curpos_dirty = true;
+   rt->dirty=true;
    if(rt->ccol>rt->cols-1)rt->ccol=rt->cols-1;
    if(rt->crow>rt->rows-1)rt->crow=rt->rows-1;
 }
@@ -386,9 +396,9 @@ void rote_es_interpret_csi(RoteTerm *rt) {
       case 'r': /* set scrolling region */
          interpret_csi_DECSTBM(rt, rt->pd->csiparam, param_count); break;
       case 's': /* save cursor location */
-         interpret_csi_SAVECUR(rt, rt->pd->csiparam, param_count); break;
+         interpret_csi_SAVECUR(rt);/*, rt->pd->csiparam, param_count);*/ break;
       case 'u': /* restore cursor location */
-         interpret_csi_RESTORECUR(rt, rt->pd->csiparam, param_count); break;
+         interpret_csi_RESTORECUR(rt);/*, rt->pd->csiparam, param_count);*/ break;
 //      #ifdef DEBUG
       default: 
          fprintf(stderr, "Unrecogized CSI: <%s>\n", rt->pd->esbuf); break;

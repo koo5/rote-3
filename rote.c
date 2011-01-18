@@ -38,18 +38,17 @@ Copyright (c) 2004 Bruno T. C. de Oliveira
 #include "term.h"
 
 #ifdef WINDOWS
-struct timeval {
-  time_t      tv_sec;
-  suseconds_t tv_usec;
-};
+#include "sys/select.h"
+//struct timeval {
+  //time_t      tv_sec;
+  //suseconds_t tv_usec;
+//};
 #endif
 
 void tt_winsize(RoteTerm *rt,int fd, int xx, int yy)
 {
     struct winsize  ws;
 //    printf ("winsize\n");
-    if (fd < 0)
-	return;
 
     if((xx==rt->cols)&&(yy==rt->rows))
 	return;
@@ -61,46 +60,48 @@ void tt_winsize(RoteTerm *rt,int fd, int xx, int yy)
 #ifndef __CYGWIN32__
     ws.ws_xpixel = ws.ws_ypixel = 0;
 #endif
-
-    ioctl(fd, TIOCGWINSZ, &ws);
-//    printf ("ioctlin from %i %i %i %i \n",ws.ws_col, ws.ws_row, ws.ws_xpixel, ws.ws_ypixel);
-    ws.ws_col = (unsigned short)xx;
-    ws.ws_row = (unsigned short)yy;
-    ioctl(fd, TIOCSWINSZ, &ws);
-//    printf ("ioctled to %i %i %i %i \n",ws.ws_col, ws.ws_row, ws.ws_xpixel, ws.ws_ypixel);
+    if(fd>=0)
+    {
+	ioctl(fd, TIOCGWINSZ, &ws);
+// 	printf ("ioctlin from %i %i %i %i \n",ws.ws_col, ws.ws_row, ws.ws_xpixel, ws.ws_ypixel);
+	ws.ws_col = (unsigned short)xx;
+        ws.ws_row = (unsigned short)yy;
+        ioctl(fd, TIOCSWINSZ, &ws);
+//        printf ("ioctled to %i %i %i %i \n",ws.ws_col, ws.ws_row, ws.ws_xpixel, ws.ws_ypixel);
+    }
 //    if ((ws.ws_col==xx)&&(ws.ws_row==yy))
-
-	int or=rt->rows;
+	int oldr=rt->rows;
 	int oc=rt->cols;
 	int i;
 	rt->cols=xx;
 	rt->rows=yy;
 
-//        printf ("W\n");    
-	for (i = yy; i < or; i++)
+  //      printf ("W\n");    
+	for (i = yy; i < oldr; i++)
 	{//	printf(";;%i;;\n", i);
     		free(rt->cells[i]);
     	}
-	if(or != yy)
+	if(oldr != yy)
 	{
 		rt->line_dirty = (bool*) realloc(rt->line_dirty, sizeof(bool) * rt->rows);
 		rt->cells = (RoteCell**) realloc(rt->cells, sizeof(RoteCell*) * rt->rows);
 	}
-	for (i = or; i < yy; i++)
+	for (i = oldr; i < yy; i++)
 	{
 		rt->line_dirty[i] = 1;
+		rt->dirty=1;
     		rt->cells[i] = (RoteCell*) malloc(sizeof(RoteCell) * rt->cols);    
     	}
 
     if(oc != xx)
     {
-//        printf ("X\n");    
+    //    printf ("X\n");    
 	for (i = 0; i < yy; i++)
 	{
     	    rt->cells[i] = (RoteCell*) realloc(rt->cells[i], sizeof(RoteCell) * rt->cols);
 //    	    printf("resized row %i at address %i\n", i, rt->cells[i]);
     	}
-//    	printf("QUACK!\n");
+    //	printf("QUACK!\n");
     }
     rt->scrollbottom+=yy;
     if(rt->scrollbottom<0)rt->scrollbottom=0;
@@ -143,8 +144,10 @@ RoteTerm *rote_vt_create(int rows, int cols) {
 
    rt->log=0;
    rt->logl=0;
+   rt->scroll=0;
    rt->logstart=0;
-    rt->cursorhidden=0;
+   rt->cursorhidden=0;
+   rt->stoppedscrollback=0;//this is just informational, for teh UI
    /* create the cell matrix */
    rt->cells = (RoteCell**) malloc(sizeof(RoteCell*) * rt->rows);
    for (i = 0; i < rt->rows; i++) {
@@ -182,12 +185,12 @@ RoteTerm *rote_vt_create(int rows, int cols) {
 }
 
 void rote_vt_destroy(RoteTerm *rt) {
-   int i;
+   unsigned int i;
    if (!rt) return;
 
    free(rt->pd);
    free(rt->line_dirty);
-   for (i = 0; i < rt->rows; i++) free(rt->cells[i]);
+   for (i = 0; i < (unsigned int)rt->rows; i++) free(rt->cells[i]);
    free(rt->cells);
    if(rt->log)
    {
@@ -227,7 +230,7 @@ void rote_vt_draw(RoteTerm *rt, WINDOW *win, int srow, int scol,
    wmove(win, srow + rt->crow, scol + rt->ccol);
 }
 */
-pid_t rote_vt_forkpty(RoteTerm *rt, const char *command) {
+pid_t rote_vt_forkpty(RoteTerm *rt, const char *command, char * env, char *envval) {
    struct winsize ws;
    pid_t childpid;
    
@@ -244,6 +247,8 @@ pid_t rote_vt_forkpty(RoteTerm *rt, const char *command) {
       /* Cajole application into using linux-console-compatible escape
        * sequences (which is what we are prepared to interpret) */
       setenv("TERM", "linux", 1);
+      if(env)
+        setenv(env, envval, 1);
 
       /* Now we will exec /bin/sh -c command. */
       execl("/bin/sh", "/bin/sh", "-c", command, NULL);
@@ -297,7 +302,7 @@ void rote_vt_update(RoteTerm *rt) {
    }
 }
 		    //?//
-void rote_vt_update_thready(char * buf, int bs, int * br, RoteTerm *rt) {
+void rote_vt_update_thready(char * buf, int buflen, int * br, RoteTerm *rt) {
    fd_set ifs;
    struct timeval tvzero;
 
@@ -313,12 +318,12 @@ void rote_vt_update_thready(char * buf, int bs, int * br, RoteTerm *rt) {
        return; /* nothing to read, or select() failed */
       /* read what we can. This is guaranteed not to block, since
        * select() told us there was something to read. */
-      bytesread = read(rt->pd->pty, buf, 512);
+      bytesread = read(rt->pd->pty, buf, buflen);
       if((bytesread < 0) && (errno != EAGAIN))
       {
-             errno=0;
+            errno=0;
     	    rote_vt_forsake_child(rt);
-//    	    printf("dfsdfdfsHAHA!/n");
+    	    printf("my child!/n");
       }
       if (bytesread <= 0) return;
       *br=bytesread;
@@ -339,6 +344,7 @@ void rote_vt_write(RoteTerm *rt, const char *data, int len) {
       if (byteswritten < 0) {
          /* very ugly way to inform the error. Improvements welcome! */
          static char errormsg[] = "\n(ROTE: pty write() error)\n";
+         //rt->status=strdup(errormsg);
          rote_vt_inject(rt, errormsg, strlen(errormsg));
          return;
       }
@@ -370,6 +376,7 @@ void rote_vt_restore_snapshot(RoteTerm *rt, void *snapbuf) {
 
    for (i = 0; i < rt->rows; i++, snapbuf += bytes_per_row) {
       rt->line_dirty[i] = true;
+      rt->dirty=1;
       memcpy(rt->cells[i], snapbuf, bytes_per_row);
    }
 }
@@ -420,14 +427,14 @@ char * rotoclipin(int sel)
     RoteTerm *t;
     t = rote_vt_create(10,10);
     if(sel)
-        rote_vt_forkpty(t, "xclip -o -selection clipboard");
+        rote_vt_forkpty(t, "xclip -o -selection clipboard",0,0);
     else
-        rote_vt_forkpty(t, "xclip -o");
+        rote_vt_forkpty(t, "xclip -o",0,0);
     int br=0;
-    buf=malloc(512);
-    rote_vt_update_thready(buf, 6, &br,t);
+    buf=(char*)malloc(1512513);
+    rote_vt_update_thready(buf, 1512513, &br,t);
     //?
-    buf[br]=0;
+    if(br)buf[br]=0;
     rote_vt_forsake_child(t);
     rote_vt_destroy(t);
     if(br>0)return buf;
@@ -437,15 +444,45 @@ char * rotoclipin(int sel)
 void rotoclipout(char * x, RoteTerm *t, int selection)
 {
     if(selection ==3)
-	rote_vt_forkpty(t, "xclip -i -selection clipboard");
+	rote_vt_forkpty(t, "xclip -i -selection clipboard",0,0);
     else if(selection ==2)
-	rote_vt_forkpty(t, "xclip -i -selection secondary");
+	rote_vt_forkpty(t, "xclip -i -selection secondary",0,0);
     else if(selection ==1)
-	rote_vt_forkpty(t, "xclip -i");
+	rote_vt_forkpty(t, "xclip -i",0,0);
     rote_vt_write(t,x,strlen(x));
     rote_vt_write(t,"\4\4",strlen("\4\4"));
     rote_vt_update(t);
 }
 
 
+
+
+void clearscrollback(RoteTerm *t)
+{
+    for(unsigned int i=0;i<t->logl;i++)
+	if(t->log[i])free(t->log[i]);
+    free(t->log);
+    t->log=NULL;
+    t->logl=0;
+}
+
+void stopscrollback(RoteTerm *t)
+{
+    t->stoppedscrollback=1;
+}
+
+
+
+void rote_vt_clear(RoteTerm*t)
+{
+   for (int i = 0; i < t->rows; i++) {
+      /* fill row with spaces */
+      for (int j = 0; j < t->cols; j++) {
+         t->cells[i][j].ch = 0x20;    /* a space */
+         t->cells[i][j].attr = 0x70;  /* white text, black background */
+      }
+   }
+
+
+}
 
