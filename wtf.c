@@ -5,6 +5,11 @@
 #include "wtf.h"
 int wtf(unsigned char x, wtfdecoder *w)
 {
+    if(x<128)
+    {
+	w->etff = x;
+	return 1;
+    }
     if (!w->pos )
     {
         w->pos=1;
