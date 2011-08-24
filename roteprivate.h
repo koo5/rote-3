@@ -22,7 +22,7 @@ Copyright (c) 2004 Bruno T. C. de Oliveira
 #ifndef btco_ROTE_vtstate_h
 #define btco_ROTE_vtstate_h
 
-#define ESEQ_BUF_SIZE 128  /* size of escape sequence buffer */
+#define ESEQ_BUF_SIZE 256  /* size of escape sequence buffer */
 #define MAX_CUSTOM_ES_HANDLERS 32
 #define MAX_CSI_ES_PARAMS 32
 #include "wtf.h"

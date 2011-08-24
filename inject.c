@@ -18,7 +18,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 Copyright (c) 2004 Bruno T. C. de Oliveira
 */
 
-
+#include "stdio.h"
 #include "rote.h"
 #include "roteprivate.h"
 #include "inject_csi.h"
@@ -205,6 +205,7 @@ static void handle_control_char(RoteTerm *rt, char c) {
       case '\a': /* bell */
 //         printf("DING, DING!");
          /* do nothing for now... maybe a visual bell would be nice? */
+         /* sure...just give me a while */
          break;
     
       #ifdef DEBUG
@@ -287,6 +288,20 @@ static void try_interpret_escape_seq(RoteTerm *rt) {
       printf("stoping scrollback\n");
       stopscrollback(rt);
       cancel_escape_sequence(rt);
+     }
+    return;
+    }
+    if(!strncmp(rt->pd->esbuf, "loopback",rt->pd->esbuf_len<8?rt->pd->esbuf_len:8))
+    {
+     if(!strncmp(rt->pd->esbuf, "loopback", 8))
+     {
+      if (rt->pd->esbuf[rt->pd->esbuf_len -1] == -1)
+      {
+        printf("loopback\n");
+        rote_vt_write(rt, rt->pd->esbuf + 8, rt->pd->esbuf_len - 8 - 1);
+        cancel_escape_sequence(rt);
+      }
+//    printf("%d\n",(int)rt->pd->esbuf[rt->pd->esbuf_len -1]);
      }
     return;
     }
