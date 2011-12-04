@@ -4,7 +4,7 @@
 
 void sdlkeys(RoteTerm *t, int key, int unicode, int mod)
 {
-    if ( (key >= SDLK_F1) && (key <= SDLK_F15) )
+    if (key >= SDLK_F1 && key <= SDLK_F15)
     {
 		char *k;
 		if(asprintf(&k ,"kf%i", key-SDLK_F1+1)!=-1)
@@ -14,47 +14,47 @@ void sdlkeys(RoteTerm *t, int key, int unicode, int mod)
 		}
     }
     else
-    if ( (key == SDLK_SPACE) )
+    if (key == SDLK_SPACE)
 	rote_vt_keypress(t,32);
     else
     #define magic(x) rote_vt_terminfo(t, x )
-    if ( (key == SDLK_BACKSPACE) )
+    if (key == SDLK_BACKSPACE)
 	magic( "kbs");
     else
-    if ( (key == SDLK_ESCAPE) )
+    if (key == SDLK_ESCAPE)
 	rote_vt_keypress(t,27);
     else
-    if ( (key == SDLK_LEFT) )
+    if (key == SDLK_LEFT)
 	magic("kcub1");
     else
-    if ( (key == SDLK_RIGHT) )
+    if (key == SDLK_RIGHT)
 	magic( "kcuf1");
     else
-    if ( (key == SDLK_UP) )
+    if (key == SDLK_UP)
 	magic( "kcuu1");
     else
-    if ( (key == SDLK_DOWN) )
+    if (key == SDLK_DOWN)
 	magic( "kcud1");
     else
-    if ( (key == SDLK_END) )
+    if (key == SDLK_END)
 	magic( "kend");
     else
-    if ( (key == SDLK_HOME) )
+    if (key == SDLK_HOME)
 	magic("khome");
     else
-    if ( (key == SDLK_DELETE) )
+    if (key == SDLK_DELETE)
 	magic( "kdch1");
     else
-    if ( (key == SDLK_PAGEDOWN) )
+    if (key == SDLK_PAGEDOWN)
 	magic( "knp");
     else
-    if ( (key == SDLK_INSERT) )
+    if (key == SDLK_INSERT)
 	magic( "kich1");
     else
-    if ( (key == SDLK_PAGEUP) )
+    if (key == SDLK_PAGEUP)
 	magic ( "kpp" );
     else
-    if ( (key == SDLK_RETURN) )
+    if (key == SDLK_RETURN)
 	rote_vt_keypress(t,13);
     else
     if( unicode )
