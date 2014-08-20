@@ -337,18 +337,10 @@ void rote_es_interpret_csi(RoteTerm *rt) {
 	rt->cursorhidden=1;
      else if (!strncmp(rt->pd->esbuf, "[?25h", 5))
 	rt->cursorhidden=0;
-    
      else if (!strncmp(rt->pd->esbuf, "[?1001s", 7))
-     {
-//    Save DEC Private Mode Values. P s values are the same as for DECSET.
-    }
+      fprintf(stderr, "Save DEC Private Mode Values. P s values are the same as for DECSET.");
      else if ((!strncmp(rt->pd->esbuf, "[?1049h", 7))||(!strncmp(rt->pd->esbuf, "[?1049l", 7)))
-     {
-//    Save DEC Private Mode Values. P s values are the same as for DECSET.
-    }    
-
-
-
+      fprintf(stderr, "Save DEC Private Mode Values. P s values are the same as for DECSET.");
     else
       fprintf(stderr, "Ignoring private-mode CSI: <%s>\n", rt->pd->esbuf);
     return; 
@@ -407,3 +399,8 @@ void rote_es_interpret_csi(RoteTerm *rt) {
    }
 }
 
+/*
+some info on sequences:
+https://www.gnu.org/software/screen/manual/screen.html
+was it the origin mode that prevented things like pidgin and mc from displaying correctly?
+*/

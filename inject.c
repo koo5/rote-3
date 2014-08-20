@@ -270,6 +270,7 @@ static void try_interpret_escape_seq(RoteTerm *rt) {
       return;
    }
 
+   //neat stuff, but i wonder why i didnt use the custom handlers mechanism
    if (firstchar != '[' && firstchar != ']') {
     if(!strncmp(rt->pd->esbuf, "clearscrollback",rt->pd->esbuf_len))
     {
@@ -372,4 +373,3 @@ void rote_vt_inject(RoteTerm *rt, const char *data, int len) {
    }
    rt->dirty=1;
 }
-
